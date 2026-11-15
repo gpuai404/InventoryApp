@@ -52,7 +52,6 @@ public sealed class WarrantyPlanCommandService
             .GetByIdAsync(typedId, cancellationToken)
             .RequireFoundAsync(typedId.Value);
         var revised = plan.Revise(
-            request.Type,
             request.Name,
             new WarrantyTerm(request.TermMonths),
             request.CoverageDescription);

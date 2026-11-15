@@ -19,7 +19,8 @@ public sealed class IssuerProfileAndWarrantyPlanCommandServiceTests
 
         Assert.Null(await service.GetCurrentAsync());
         await service.SaveAsync(new SaveIssuerProfileRequest("Contoso", "BE 0123", "Street 1"));
-        var current = await service.SaveAsync(new SaveIssuerProfileRequest("Contoso Retail", "BE 0456"));
+        var current = await service.SaveAsync(
+            new SaveIssuerProfileRequest("Contoso Retail", "BE 0456", "Street 2"));
 
         Assert.Equal("Contoso Retail", current.Name);
         Assert.Equal("BE 0456", (await store.GetCurrentAsync())!.VatNumber);
@@ -35,6 +36,25 @@ public sealed class IssuerProfileAndWarrantyPlanCommandServiceTests
 
         Assert.Equal(WarrantyType.ProductSale, plan.Type);
         Assert.Equal(24, plan.TermMonths);
+    }
+
+    [Fact]
+    public async Task Warranty_plan_update_preserves_its_workflow_type()
+    {
+        var plans = new FakeWarrantyPlanRepository();
+        var service = new WarrantyPlanCommandService(plans, plans, new FakeUnitOfWork());
+        var created = await service.CreateAsync(new CreateWarrantyPlanRequest(
+            WarrantyType.Repair,
+            "Repair",
+            6,
+            "Repair work"));
+
+        var updated = await service.UpdateAsync(
+            created.Id,
+            new UpdateWarrantyPlanRequest("Extended repair", 12, "Extended repair work"));
+
+        Assert.Equal(WarrantyType.Repair, updated.Type);
+        Assert.Equal(12, updated.TermMonths);
     }
 
     private sealed class FakeIssuerProfileStore : IIssuerProfileStore

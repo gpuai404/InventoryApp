@@ -1,24 +1,15 @@
 using WarrantyIssueXE.Application.Abstractions.Persistence;
 using WarrantyIssueXE.Domain.Identifiers;
-using WarrantyIssueXE.Domain.ValueObjects;
 
 namespace WarrantyIssueXE.Application.Products;
 
 /// <summary>
-/// Coordinates product read use cases. It has no write dependency.
+/// Coordinates product catalog reads with no write dependency.
 /// </summary>
-public sealed class ProductQueryService
+public sealed class ProductQueryService(IProductReader productReader)
 {
-    private readonly IProductReader _productReader;
-    private readonly IProductVariantReader _variantReader;
-
-    public ProductQueryService(
-        IProductReader productReader,
-        IProductVariantReader variantReader)
-    {
-        _productReader = productReader ?? throw new ArgumentNullException(nameof(productReader));
-        _variantReader = variantReader ?? throw new ArgumentNullException(nameof(variantReader));
-    }
+    private readonly IProductReader _productReader =
+        productReader ?? throw new ArgumentNullException(nameof(productReader));
 
     public async Task<ProductDto?> GetProductAsync(
         Guid productId,
@@ -36,43 +27,5 @@ public sealed class ProductQueryService
     {
         var products = await _productReader.ListAsync(cancellationToken);
         return products.Select(product => product.ToDto()).ToArray();
-    }
-
-    public async Task<ProductVariantDto?> GetProductVariantAsync(
-        Guid variantId,
-        CancellationToken cancellationToken = default)
-    {
-        var variant = await _variantReader.GetByIdAsync(
-            new ProductVariantId(variantId),
-            cancellationToken);
-
-        return variant?.ToDto();
-    }
-
-    public async Task<IReadOnlyList<ProductVariantDto>> ListProductVariantsAsync(
-        CancellationToken cancellationToken = default)
-    {
-        var variants = await _variantReader.ListAsync(cancellationToken);
-        return variants.Select(variant => variant.ToDto()).ToArray();
-    }
-
-    public async Task<IReadOnlyList<ProductVariantDto>> ListProductVariantsAsync(
-        Guid productId,
-        CancellationToken cancellationToken = default)
-    {
-        var variants = await _variantReader.ListByProductIdAsync(new ProductId(productId), cancellationToken);
-        return variants.Select(variant => variant.ToDto()).ToArray();
-    }
-
-    public async Task<ProductVariantDto?> FindVariantByBarcodeAsync(
-        string barcode,
-        CancellationToken cancellationToken = default)
-    {
-        var productBarcode = new ProductBarcode(barcode);
-        var variant = await _variantReader.FindByBarcodeAsync(
-            productBarcode,
-            cancellationToken);
-
-        return variant?.ToDto();
     }
 }

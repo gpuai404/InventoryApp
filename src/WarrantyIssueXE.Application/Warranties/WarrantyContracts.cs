@@ -20,19 +20,17 @@ public sealed record ExplicitCoverageInput(int TermMonths, string CoverageDescri
 
 public sealed record ReplacedPartInput(string Description, string? PartNumber = null);
 
-public sealed record IssueWarrantyForSaleRequest(
-    Guid ProductVariantId,
+public sealed record IssueProductSaleWarrantyRequest(
+    Guid ProductId,
     CoverageInput Coverage,
-    string? SerialNumber,
+    string? Imei,
     CustomerInput Customer,
-    DateOnly PurchasedOn,
-    decimal PurchasePriceAmount,
-    string PurchasePriceCurrencyCode);
+    DateOnly PurchasedOn);
 
-public sealed record IssueWarrantyForRepairRequest(
-    Guid ProductVariantId,
+public sealed record IssueRepairWarrantyRequest(
+    Guid ProductId,
     CoverageInput Coverage,
-    string? SerialNumber,
+    string? Imei,
     CustomerInput Customer,
     DateOnly RepairedOn,
     string WorkDescription,
@@ -44,12 +42,18 @@ public sealed record CustomerSnapshotDto(
     string? Phone,
     string? Address);
 
-public sealed record ProductSnapshotDto(string ProductName, string VariantName, string? Sku);
+public sealed record ProductSnapshotDto(
+    Guid ProductId,
+    string ProductName,
+    Guid CategoryId,
+    string CategoryName,
+    decimal PriceAmount,
+    string PriceCurrencyCode);
 
 public sealed record IssuerSnapshotDto(
     string Name,
     string? VatNumber,
-    string? Address,
+    string Address,
     string? Email,
     string? Phone);
 
@@ -59,7 +63,7 @@ public sealed record CoverageSnapshotDto(
     string CoverageDescription,
     string ScopeStatement);
 
-public sealed record SaleDetailsDto(DateOnly PurchasedOn, decimal PurchasePriceAmount, string PurchasePriceCurrencyCode);
+public sealed record SaleDetailsDto(DateOnly PurchasedOn);
 
 public sealed record ReplacedPartSnapshotDto(string Description, string? PartNumber);
 
@@ -72,10 +76,8 @@ public sealed record WarrantyDto(
     Guid Id,
     string CertificateNumber,
     WarrantyType Type,
-    WarrantyStatus Status,
-    Guid ProductVariantId,
     Guid? WarrantyPlanId,
-    string? SerialNumber,
+    string? Imei,
     DateTimeOffset IssuedAt,
     DateOnly StartsOn,
     DateOnly ExpiresOn,
@@ -84,6 +86,4 @@ public sealed record WarrantyDto(
     IssuerSnapshotDto Issuer,
     CoverageSnapshotDto Coverage,
     SaleDetailsDto? SaleDetails,
-    RepairDetailsDto? RepairDetails,
-    DateTimeOffset? VoidedAt,
-    string? VoidReason);
+    RepairDetailsDto? RepairDetails);

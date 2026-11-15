@@ -9,7 +9,6 @@ public sealed record CreateWarrantyPlanRequest(
     string CoverageDescription);
 
 public sealed record UpdateWarrantyPlanRequest(
-    WarrantyType Type,
     string Name,
     int TermMonths,
     string CoverageDescription);

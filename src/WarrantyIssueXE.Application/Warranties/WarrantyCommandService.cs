@@ -1,5 +1,5 @@
-using WarrantyIssueXE.Application.Abstractions.Persistence;
 using WarrantyIssueXE.Application.Abstractions.Certificates;
+using WarrantyIssueXE.Application.Abstractions.Persistence;
 using WarrantyIssueXE.Application.Abstractions.Time;
 using WarrantyIssueXE.Application.Common;
 using WarrantyIssueXE.Domain.Entities;
@@ -12,52 +12,49 @@ using WarrantyIssueXE.Domain.WarrantyDetails;
 namespace WarrantyIssueXE.Application.Warranties;
 
 /// <summary>
-/// Coordinates warranty issuance and the one-way void lifecycle. It deliberately
-/// has no editable or archive operation for an issued certificate.
+/// Coordinates the two supported issuance use cases. Issued warranties expose
+/// no update, correction, cancellation, or void operation.
 /// </summary>
 public sealed class WarrantyCommandService
 {
-    private readonly IProductVariantReader _variantReader;
     private readonly IProductReader _productReader;
+    private readonly ICategoryReader _categoryReader;
     private readonly IIssuerProfileStore _issuerProfileStore;
     private readonly IWarrantyPlanReader _planReader;
-    private readonly IWarrantyReader _warrantyReader;
     private readonly IWarrantyWriter _warrantyWriter;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICertificateNumberGenerator _certificateNumberGenerator;
     private readonly IBusinessClock _clock;
 
     public WarrantyCommandService(
-        IProductVariantReader variantReader,
         IProductReader productReader,
+        ICategoryReader categoryReader,
         IIssuerProfileStore issuerProfileStore,
         IWarrantyPlanReader planReader,
-        IWarrantyReader warrantyReader,
         IWarrantyWriter warrantyWriter,
         IUnitOfWork unitOfWork,
         ICertificateNumberGenerator certificateNumberGenerator,
         IBusinessClock clock)
     {
-        _variantReader = variantReader ?? throw new ArgumentNullException(nameof(variantReader));
         _productReader = productReader ?? throw new ArgumentNullException(nameof(productReader));
+        _categoryReader = categoryReader ?? throw new ArgumentNullException(nameof(categoryReader));
         _issuerProfileStore = issuerProfileStore ?? throw new ArgumentNullException(nameof(issuerProfileStore));
         _planReader = planReader ?? throw new ArgumentNullException(nameof(planReader));
-        _warrantyReader = warrantyReader ?? throw new ArgumentNullException(nameof(warrantyReader));
         _warrantyWriter = warrantyWriter ?? throw new ArgumentNullException(nameof(warrantyWriter));
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
         _certificateNumberGenerator = certificateNumberGenerator ?? throw new ArgumentNullException(nameof(certificateNumberGenerator));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
     }
 
-    public async Task<WarrantyDto> IssueForSaleAsync(
-        IssueWarrantyForSaleRequest request,
+    public async Task<WarrantyDto> IssueProductSaleWarrantyAsync(
+        IssueProductSaleWarrantyRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(request.Customer);
         ArgumentNullException.ThrowIfNull(request.Coverage);
 
-        var context = await LoadIssuanceContextAsync(request.ProductVariantId, cancellationToken);
+        var context = await LoadIssuanceContextAsync(request.ProductId, cancellationToken);
         var coverage = await ResolveCoverageAsync(
             request.Coverage,
             WarrantyType.ProductSale,
@@ -66,33 +63,31 @@ public sealed class WarrantyCommandService
 
         var warranty = Warranty.IssueForSale(
             _certificateNumberGenerator.Generate(),
-            context.Variant.Id,
             coverage.WarrantyPlanId,
-            request.SerialNumber,
+            ToImei(request.Imei),
             currentTime.UtcNow,
             currentTime.BusinessDate,
             ToCustomerSnapshot(request.Customer),
-            new ProductSnapshot(context.Product.Name, context.Variant.Name, context.Variant.Sku),
+            context.Product.ToSnapshot(context.Category.Name),
             context.Issuer.ToSnapshot(),
             coverage.Snapshot,
-            new SaleDetails(
-                request.PurchasedOn,
-                new Money(request.PurchasePriceAmount, request.PurchasePriceCurrencyCode)));
+            new SaleDetails(request.PurchasedOn));
 
         await _warrantyWriter.AddAsync(warranty, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
         return warranty.ToDto();
     }
 
-    public async Task<WarrantyDto> IssueForRepairAsync(
-        IssueWarrantyForRepairRequest request,
+    public async Task<WarrantyDto> IssueRepairWarrantyAsync(
+        IssueRepairWarrantyRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(request.Customer);
         ArgumentNullException.ThrowIfNull(request.Coverage);
 
-        var context = await LoadIssuanceContextAsync(request.ProductVariantId, cancellationToken);
+        var context = await LoadIssuanceContextAsync(request.ProductId, cancellationToken);
         var coverage = await ResolveCoverageAsync(
             request.Coverage,
             WarrantyType.Repair,
@@ -108,55 +103,39 @@ public sealed class WarrantyCommandService
 
         var warranty = Warranty.IssueForRepair(
             _certificateNumberGenerator.Generate(),
-            context.Variant.Id,
             coverage.WarrantyPlanId,
-            request.SerialNumber,
+            ToImei(request.Imei),
             currentTime.UtcNow,
             currentTime.BusinessDate,
             ToCustomerSnapshot(request.Customer),
-            new ProductSnapshot(context.Product.Name, context.Variant.Name, context.Variant.Sku),
+            context.Product.ToSnapshot(context.Category.Name),
             context.Issuer.ToSnapshot(),
             coverage.Snapshot,
             new RepairDetails(request.RepairedOn, request.WorkDescription, replacedParts));
 
         await _warrantyWriter.AddAsync(warranty, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
         return warranty.ToDto();
     }
 
-    public async Task<WarrantyDto> VoidAsync(
-        Guid warrantyId,
-        string reason,
-        CancellationToken cancellationToken = default)
-    {
-        var typedWarrantyId = new WarrantyId(warrantyId);
-        var warranty = await _warrantyReader
-            .GetByIdAsync(typedWarrantyId, cancellationToken)
-            .RequireFoundAsync(typedWarrantyId.Value);
-        var voided = warranty.Void(reason, _clock.GetCurrent().UtcNow);
-
-        await _warrantyWriter.VoidAsync(voided, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        return voided.ToDto();
-    }
-
     private async Task<IssuanceContext> LoadIssuanceContextAsync(
-        Guid productVariantId,
+        Guid productId,
         CancellationToken cancellationToken)
     {
-        var typedVariantId = new ProductVariantId(productVariantId);
-        var variant = await _variantReader
-            .GetByIdAsync(typedVariantId, cancellationToken)
-            .RequireFoundAsync(typedVariantId.Value);
+        var typedProductId = new ProductId(productId);
         var product = await _productReader
-            .GetByIdAsync(variant.ProductId, cancellationToken)
-            .RequireFoundAsync(variant.ProductId.Value);
+            .GetByIdAsync(typedProductId, cancellationToken)
+            .RequireFoundAsync(typedProductId.Value);
+        var category = await _categoryReader
+            .GetByIdAsync(product.CategoryId, cancellationToken)
+            .RequireFoundAsync(product.CategoryId.Value);
         var issuer = await _issuerProfileStore.GetCurrentAsync(cancellationToken)
             ?? throw new ApplicationValidationException(
                 "Configure the issuer profile before issuing a warranty.",
                 "issuerProfile");
 
-        return new IssuanceContext(variant, product, issuer);
+        return new IssuanceContext(product, category, issuer);
     }
 
     private async Task<ResolvedCoverage> ResolveCoverageAsync(
@@ -171,19 +150,17 @@ public sealed class WarrantyCommandService
                 .GetByIdAsync(typedPlanId, cancellationToken)
                 .RequireFoundAsync(typedPlanId.Value);
 
-            return new ResolvedCoverage(
-                typedPlanId,
-                plan.CreateCoverageFor(type));
+            return new ResolvedCoverage(typedPlanId, plan.CreateCoverageFor(type));
         }
 
         if (coverage is ExplicitCoverageInput explicitCoverage)
         {
             var term = new WarrantyTerm(explicitCoverage.TermMonths);
-            return new ResolvedCoverage(
-                null,
-                type == WarrantyType.ProductSale
-                    ? CoverageSnapshot.ForProductSale(term, explicitCoverage.CoverageDescription)
-                    : CoverageSnapshot.ForRepair(term, explicitCoverage.CoverageDescription));
+            var snapshot = type == WarrantyType.ProductSale
+                ? CoverageSnapshot.ForProductSale(term, explicitCoverage.CoverageDescription)
+                : CoverageSnapshot.ForRepair(term, explicitCoverage.CoverageDescription);
+
+            return new ResolvedCoverage(null, snapshot);
         }
 
         throw new ApplicationValidationException(
@@ -191,10 +168,13 @@ public sealed class WarrantyCommandService
             nameof(coverage));
     }
 
+    private static Imei? ToImei(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : new Imei(value);
+
     private static CustomerSnapshot ToCustomerSnapshot(CustomerInput input) =>
         new(input.FullName, input.Email, input.Phone, input.Address);
 
-    private sealed record IssuanceContext(ProductVariant Variant, Product Product, IssuerProfile Issuer);
+    private sealed record IssuanceContext(Product Product, Category Category, IssuerProfile Issuer);
 
     private sealed record ResolvedCoverage(WarrantyPlanId? WarrantyPlanId, CoverageSnapshot Snapshot);
 }
