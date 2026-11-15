@@ -22,3 +22,7 @@ end_of_line = lf
 insert_final_newline = true
 indent_style = space
 indent_size = 2
+
+# EF Core scaffolds migration sources with a UTF-8 byte-order mark.
+[src/InventoryApp.Infrastructure/Persistence/Migrations/*.cs]
+charset = utf-8-bom

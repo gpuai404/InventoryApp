@@ -6,3 +6,6 @@
 .vs/
 *.user
 *.suo
+
+# macOS metadata
+.DS_Store
