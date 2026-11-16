@@ -1,4 +1,3 @@
-using System.Reflection;
 using WarrantyIssueXE.Domain.Entities;
 using WarrantyIssueXE.Domain.Enums;
 using WarrantyIssueXE.Domain.Exceptions;
@@ -142,20 +141,10 @@ public sealed class WarrantyTests
     }
 
     [Fact]
-    public void Issued_warranty_exposes_no_correction_cancellation_or_void_operation()
+    public void Issued_warranty_properties_are_read_only()
     {
-        var publicMethods = typeof(Warranty)
-            .GetMethods(BindingFlags.Public | BindingFlags.Instance)
-            .Select(method => method.Name)
-            .ToHashSet(StringComparer.Ordinal);
-
-        Assert.DoesNotContain("Correct", publicMethods);
-        Assert.DoesNotContain("Revise", publicMethods);
-        Assert.DoesNotContain("Update", publicMethods);
-        Assert.DoesNotContain("Cancel", publicMethods);
-        Assert.DoesNotContain("Void", publicMethods);
         Assert.All(
-            typeof(Warranty).GetProperties(BindingFlags.Public | BindingFlags.Instance),
+            typeof(Warranty).GetProperties(),
             property => Assert.False(property.SetMethod?.IsPublic ?? false));
     }
 

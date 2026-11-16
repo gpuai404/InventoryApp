@@ -12,8 +12,8 @@ using WarrantyIssueXE.Domain.WarrantyDetails;
 namespace WarrantyIssueXE.Application.Warranties;
 
 /// <summary>
-/// Coordinates the two supported issuance use cases. Issued warranties expose
-/// no update, correction, cancellation, or void operation.
+/// Coordinates product-sale and repair warranty issuance. Issued warranties
+/// are immutable historical records.
 /// </summary>
 public sealed class WarrantyCommandService
 {

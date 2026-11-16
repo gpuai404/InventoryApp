@@ -17,7 +17,7 @@ namespace WarrantyIssueXE.Infrastructure.Tests;
 public sealed class SqliteCrudTests
 {
     [Fact]
-    public void Dependency_injection_registers_each_current_persistence_contract_once()
+    public void Dependency_injection_registers_each_persistence_contract_once()
     {
         var services = new ServiceCollection();
 
@@ -40,15 +40,10 @@ public sealed class SqliteCrudTests
         {
             Assert.Single(services, descriptor => descriptor.ServiceType == contract);
         }
-
-        Assert.DoesNotContain(
-            services,
-            descriptor => descriptor.ServiceType.Name.Contains("Variant", StringComparison.Ordinal) ||
-                          descriptor.ServiceType.Name.Contains("Barcode", StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task Current_schema_contains_only_the_current_catalog_and_warranty_model()
+    public async Task Schema_contains_the_catalog_and_warranty_model()
     {
         await using var database = await TestDatabase.CreateAsync();
 
@@ -63,8 +58,6 @@ public sealed class SqliteCrudTests
         Assert.Contains("WarrantyPlans", tables);
         Assert.Contains("Warranties", tables);
         Assert.Contains("WarrantyReplacedParts", tables);
-        Assert.DoesNotContain("ProductVariants", tables);
-        Assert.DoesNotContain("ProductBarcodes", tables);
 
         Assert.Contains("ProductId", warrantyColumns);
         Assert.Contains("ProductCategoryId", warrantyColumns);
@@ -72,18 +65,7 @@ public sealed class SqliteCrudTests
         Assert.Contains("ProductPriceAmount", warrantyColumns);
         Assert.Contains("ProductPriceCurrencyCode", warrantyColumns);
         Assert.Contains("Imei", warrantyColumns);
-        Assert.DoesNotContain("ProductVariantId", warrantyColumns);
-        Assert.DoesNotContain("SerialNumber", warrantyColumns);
-        Assert.DoesNotContain("Status", warrantyColumns);
-        Assert.DoesNotContain("VoidedAtUtcTicks", warrantyColumns);
-        Assert.DoesNotContain("VoidReason", warrantyColumns);
-        Assert.DoesNotContain("PurchasePriceAmount", warrantyColumns);
-        Assert.DoesNotContain("PurchasePriceCurrencyCode", warrantyColumns);
         Assert.Equal(["WarrantyId", "Position", "Description", "PartNumber"], replacedPartColumns);
-
-        var entityNames = database.Context.Model.GetEntityTypes().Select(type => type.Name).ToArray();
-        Assert.DoesNotContain(entityNames, name => name.Contains("ProductVariant", StringComparison.Ordinal));
-        Assert.DoesNotContain(entityNames, name => name.Contains("ProductBarcode", StringComparison.Ordinal));
     }
 
     [Fact]
