@@ -15,7 +15,7 @@ internal sealed class IssuerProfileConfiguration : IEntityTypeConfiguration<Issu
         entity.Property(profile => profile.Id).ValueGeneratedNever();
         entity.Property(profile => profile.Name).IsRequired().HasMaxLength(DomainTextLimits.Name);
         entity.Property(profile => profile.VatNumber).HasMaxLength(DomainTextLimits.VatNumber);
-        entity.Property(profile => profile.Address).HasMaxLength(DomainTextLimits.ContactAddress);
+        entity.Property(profile => profile.Address).IsRequired().HasMaxLength(DomainTextLimits.ContactAddress);
         entity.Property(profile => profile.Email).HasMaxLength(DomainTextLimits.ContactEmail);
         entity.Property(profile => profile.Phone).HasMaxLength(DomainTextLimits.ContactPhone);
         entity.Property(profile => profile.UpdatedAtUtc).IsRequired();

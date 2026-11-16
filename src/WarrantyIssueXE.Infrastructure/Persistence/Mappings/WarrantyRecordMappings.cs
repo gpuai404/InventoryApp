@@ -4,7 +4,6 @@ using WarrantyIssueXE.Domain.Identifiers;
 using WarrantyIssueXE.Domain.Snapshots;
 using WarrantyIssueXE.Domain.ValueObjects;
 using WarrantyIssueXE.Domain.WarrantyDetails;
-using WarrantyIssueXE.Infrastructure.Persistence;
 
 namespace WarrantyIssueXE.Infrastructure.Persistence.Mappings;
 
@@ -12,106 +11,59 @@ internal static partial class DomainRecordMappings
 {
     public static Warranty ToDomain(this WarrantyRecord record)
     {
+        var type = ParseEnum<WarrantyType>(record.Type, nameof(WarrantyRecord.Type));
+        ValidatePersistedShape(record, type);
+
         var coverage = CoverageSnapshot.Reconstitute(
             new WarrantyTerm(record.CoverageTermMonths),
             ParseEnum<CoverageScope>(record.CoverageScope, nameof(WarrantyRecord.CoverageScope)),
             record.CoverageDescription,
             record.CoverageScopeStatement);
-
-        SaleDetails? saleDetails = record.PurchasedOn is { } purchasedOn
-            ? new SaleDetails(
-                purchasedOn,
-                new Money(
-                    record.PurchasePriceAmount ?? throw MissingRequiredValue(nameof(record.PurchasePriceAmount)),
-                    record.PurchasePriceCurrencyCode ?? throw MissingRequiredValue(nameof(record.PurchasePriceCurrencyCode))))
+        var saleDetails = type == WarrantyType.ProductSale
+            ? new SaleDetails(record.PurchasedOn ?? throw MissingRequiredValue(nameof(record.PurchasedOn)))
             : null;
-
-        RepairDetails? repairDetails = record.RepairedOn is { } repairedOn
+        var repairDetails = type == WarrantyType.Repair
             ? new RepairDetails(
-                repairedOn,
+                record.RepairedOn ?? throw MissingRequiredValue(nameof(record.RepairedOn)),
                 record.RepairWorkDescription ?? throw MissingRequiredValue(nameof(record.RepairWorkDescription)),
                 record.ReplacedParts
                     .OrderBy(part => part.Position)
                     .Select(part => new ReplacedPartSnapshot(part.Description, part.PartNumber)))
             : null;
-
-        var type = ParseEnum<WarrantyType>(record.Type, nameof(WarrantyRecord.Type));
-        var status = ParseEnum<WarrantyStatus>(record.Status, nameof(WarrantyRecord.Status));
-        var productVariantId = new ProductVariantId(record.ProductVariantId);
         WarrantyPlanId? warrantyPlanId = record.WarrantyPlanId is { } planId
             ? new WarrantyPlanId(planId)
             : null;
-        var issuedAt = FromUtcTicks(record.IssuedAtUtcTicks, nameof(record.IssuedAtUtcTicks));
-        var customer = new CustomerSnapshot(
-            record.CustomerFullName,
-            record.CustomerEmail,
-            record.CustomerPhone,
-            record.CustomerAddress);
-        var product = new ProductSnapshot(record.ProductName, record.ProductVariantName, record.ProductSku);
-        var issuer = new IssuerSnapshot(
-            record.IssuerName,
-            record.IssuerVatNumber,
-            record.IssuerAddress,
-            record.IssuerEmail,
-            record.IssuerPhone);
-        DateTimeOffset? voidedAt = record.VoidedAtUtcTicks is { } ticks
-            ? FromUtcTicks(ticks, nameof(record.VoidedAtUtcTicks))
-            : null;
-        var warrantyId = new WarrantyId(record.Id);
+        Imei? imei = record.Imei is { } value ? new Imei(value) : null;
 
-        if (type == WarrantyType.ProductSale &&
-            (repairDetails is not null ||
-             record.RepairWorkDescription is not null ||
-             record.ReplacedParts.Count > 0))
-        {
-            throw new InvalidOperationException(
-                "A persisted product-sale warranty cannot contain repair details.");
-        }
-
-        if (type == WarrantyType.Repair &&
-            (saleDetails is not null ||
-             record.PurchasePriceAmount is not null ||
-             record.PurchasePriceCurrencyCode is not null))
-        {
-            throw new InvalidOperationException(
-                "A persisted repair warranty cannot contain sale details.");
-        }
-
-        return type == WarrantyType.ProductSale
-            ? Warranty.ReconstituteSale(
-                record.CertificateNumber,
-                status,
-                productVariantId,
-                warrantyPlanId,
-                record.SerialNumber,
-                issuedAt,
-                customer,
-                product,
-                issuer,
-                coverage,
-                saleDetails ?? throw MissingRequiredValue(nameof(record.PurchasedOn)),
-                record.StartsOn,
-                record.ExpiresOn,
-                voidedAt,
-                record.VoidReason,
-                warrantyId)
-            : Warranty.ReconstituteRepair(
-                record.CertificateNumber,
-                status,
-                productVariantId,
-                warrantyPlanId,
-                record.SerialNumber,
-                issuedAt,
-                customer,
-                product,
-                issuer,
-                coverage,
-                repairDetails ?? throw MissingRequiredValue(nameof(record.RepairedOn)),
-                record.StartsOn,
-                record.ExpiresOn,
-                voidedAt,
-                record.VoidReason,
-                warrantyId);
+        return Warranty.Reconstitute(
+            record.CertificateNumber,
+            type,
+            warrantyPlanId,
+            imei,
+            FromUtcTicks(record.IssuedAtUtcTicks, nameof(record.IssuedAtUtcTicks)),
+            new CustomerSnapshot(
+                record.CustomerFullName,
+                record.CustomerEmail,
+                record.CustomerPhone,
+                record.CustomerAddress),
+            new ProductSnapshot(
+                new ProductId(record.ProductId),
+                record.ProductName,
+                new CategoryId(record.ProductCategoryId),
+                record.ProductCategoryName,
+                new Money(record.ProductPriceAmount, record.ProductPriceCurrencyCode)),
+            new IssuerSnapshot(
+                record.IssuerName,
+                record.IssuerVatNumber,
+                record.IssuerAddress,
+                record.IssuerEmail,
+                record.IssuerPhone),
+            coverage,
+            saleDetails,
+            repairDetails,
+            record.StartsOn,
+            record.ExpiresOn,
+            new WarrantyId(record.Id));
     }
 
     public static WarrantyRecord ToRecord(this Warranty warranty) =>
@@ -120,22 +72,21 @@ internal static partial class DomainRecordMappings
             Id = warranty.Id.Value,
             CertificateNumber = Warranty.NormalizeCertificateNumber(warranty.CertificateNumber),
             Type = warranty.Type.ToString(),
-            Status = warranty.Status.ToString(),
-            ProductVariantId = warranty.ProductVariantId.Value,
             WarrantyPlanId = warranty.WarrantyPlanId?.Value,
-            SerialNumber = warranty.SerialNumber,
+            Imei = warranty.Imei?.Value,
             IssuedAtUtcTicks = ToUtcTicks(warranty.IssuedAt),
             StartsOn = warranty.StartsOn,
             ExpiresOn = warranty.ExpiresOn,
-            VoidedAtUtcTicks = warranty.VoidedAt is { } voidedAt ? ToUtcTicks(voidedAt) : null,
-            VoidReason = warranty.VoidReason,
             CustomerFullName = warranty.Customer.FullName,
             CustomerEmail = warranty.Customer.Email,
             CustomerPhone = warranty.Customer.Phone,
             CustomerAddress = warranty.Customer.Address,
+            ProductId = warranty.Product.ProductId.Value,
             ProductName = warranty.Product.ProductName,
-            ProductVariantName = warranty.Product.VariantName,
-            ProductSku = warranty.Product.Sku,
+            ProductCategoryId = warranty.Product.CategoryId.Value,
+            ProductCategoryName = warranty.Product.CategoryName,
+            ProductPriceAmount = warranty.Product.Price.Amount,
+            ProductPriceCurrencyCode = warranty.Product.Price.CurrencyCode,
             IssuerName = warranty.Issuer.Name,
             IssuerVatNumber = warranty.Issuer.VatNumber,
             IssuerAddress = warranty.Issuer.Address,
@@ -146,8 +97,6 @@ internal static partial class DomainRecordMappings
             CoverageDescription = warranty.Coverage.CoverageDescription,
             CoverageScopeStatement = warranty.Coverage.ScopeStatement,
             PurchasedOn = warranty.SaleDetails?.PurchasedOn,
-            PurchasePriceAmount = warranty.SaleDetails?.PurchasePrice.Amount,
-            PurchasePriceCurrencyCode = warranty.SaleDetails?.PurchasePrice.CurrencyCode,
             RepairedOn = warranty.RepairDetails?.RepairedOn,
             RepairWorkDescription = warranty.RepairDetails?.WorkDescription,
             ReplacedParts = warranty.RepairDetails?.ReplacedParts
@@ -174,6 +123,22 @@ internal static partial class DomainRecordMappings
             throw new InvalidOperationException(
                 $"Persisted UTC ticks in '{propertyName}' are invalid.",
                 exception);
+        }
+    }
+
+    private static void ValidatePersistedShape(WarrantyRecord record, WarrantyType type)
+    {
+        if (type == WarrantyType.ProductSale &&
+            (record.RepairedOn is not null ||
+             record.RepairWorkDescription is not null ||
+             record.ReplacedParts.Count > 0))
+        {
+            throw new InvalidOperationException("A persisted product-sale warranty cannot contain repair details.");
+        }
+
+        if (type == WarrantyType.Repair && record.PurchasedOn is not null)
+        {
+            throw new InvalidOperationException("A persisted repair warranty cannot contain sale details.");
         }
     }
 

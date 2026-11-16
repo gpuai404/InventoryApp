@@ -43,30 +43,6 @@ public sealed class WarrantyRepository(InventoryDbContext dbContext) : IWarranty
         return Task.CompletedTask;
     }
 
-    public Task VoidAsync(Warranty voidedWarranty, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(voidedWarranty);
-        var voidedAtTicks = voidedWarranty.VoidedAt is { } voidedAt
-            ? DomainRecordMappings.ToUtcTicks(voidedAt)
-            : throw new ArgumentException("A voided warranty must have a void timestamp.", nameof(voidedWarranty));
-
-        // Status is an EF concurrency token. Setting its original value to
-        // Issued produces a conditional SQL update at commit. Only lifecycle
-        // columns are modified; issuance facts cannot be overwritten.
-        var record = new WarrantyRecord { Id = voidedWarranty.Id.Value };
-        _dbContext.Warranties.Attach(record);
-        var entry = _dbContext.Entry(record);
-        entry.Property(warranty => warranty.Status).OriginalValue = "Issued";
-        entry.Property(warranty => warranty.Status).CurrentValue = "Voided";
-        entry.Property(warranty => warranty.Status).IsModified = true;
-        entry.Property(warranty => warranty.VoidedAtUtcTicks).CurrentValue = voidedAtTicks;
-        entry.Property(warranty => warranty.VoidedAtUtcTicks).IsModified = true;
-        entry.Property(warranty => warranty.VoidReason).CurrentValue = voidedWarranty.VoidReason;
-        entry.Property(warranty => warranty.VoidReason).IsModified = true;
-
-        return Task.CompletedTask;
-    }
-
     private IQueryable<WarrantyRecord> QueryWithParts() =>
         _dbContext.Warranties.Include(warranty => warranty.ReplacedParts);
 }

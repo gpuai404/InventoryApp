@@ -10,7 +10,9 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<ProductRec
     {
         entity.ToTable(
             "Products",
-            table => table.HasCheckConstraint("CK_Products_PriceAmount", "PriceAmount >= 0"));
+            table => table.HasCheckConstraint(
+                "CK_Products_PriceAmount",
+                "CAST(PriceAmount AS NUMERIC) >= 0"));
         entity.HasKey(product => product.Id);
         entity.Property(product => product.Id).ValueGeneratedNever();
         entity.Property(product => product.CategoryId).IsRequired();

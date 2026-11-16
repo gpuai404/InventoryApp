@@ -10,7 +10,7 @@ internal sealed class IssuerProfileRecord
 
     public string? VatNumber { get; set; }
 
-    public string? Address { get; set; }
+    public string Address { get; set; } = null!;
 
     public string? Email { get; set; }
 

@@ -42,7 +42,11 @@ public sealed class WarrantyPlanRepository(InventoryDbContext dbContext, TimePro
             cancellationToken)
             ?? throw PersistenceErrors.MissingRecord(nameof(WarrantyPlan), entity.Id.Value);
 
-        record.Type = entity.Type.ToString();
+        if (!string.Equals(record.Type, entity.Type.ToString(), StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("A warranty plan's workflow type cannot be changed.");
+        }
+
         record.Name = entity.Name;
         record.TermMonths = entity.Term.Months;
         record.CoverageDescription = entity.CoverageDescription;

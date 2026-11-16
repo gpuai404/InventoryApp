@@ -56,10 +56,6 @@ public static class DependencyInjection
         services.AddScoped<IProductReader>(provider => provider.GetRequiredService<ProductRepository>());
         services.AddScoped<IProductWriter>(provider => provider.GetRequiredService<ProductRepository>());
 
-        services.AddScoped<ProductVariantRepository>();
-        services.AddScoped<IProductVariantReader>(provider => provider.GetRequiredService<ProductVariantRepository>());
-        services.AddScoped<IProductVariantWriter>(provider => provider.GetRequiredService<ProductVariantRepository>());
-
         services.AddScoped<WarrantyPlanRepository>();
         services.AddScoped<IWarrantyPlanReader>(provider => provider.GetRequiredService<WarrantyPlanRepository>());
         services.AddScoped<IWarrantyPlanWriter>(provider => provider.GetRequiredService<WarrantyPlanRepository>());
