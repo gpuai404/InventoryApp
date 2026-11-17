@@ -11,7 +11,7 @@ public sealed class ProductQueryService(IProductReader productReader)
     private readonly IProductReader _productReader =
         productReader ?? throw new ArgumentNullException(nameof(productReader));
 
-    public async Task<ProductDto?> GetProductAsync(
+    public async Task<ProductDto?> GetAsync(
         Guid productId,
         CancellationToken cancellationToken = default)
     {
@@ -22,7 +22,7 @@ public sealed class ProductQueryService(IProductReader productReader)
         return product?.ToDto();
     }
 
-    public async Task<IReadOnlyList<ProductDto>> ListProductsAsync(
+    public async Task<IReadOnlyList<ProductDto>> ListAsync(
         CancellationToken cancellationToken = default)
     {
         var products = await _productReader.ListAsync(cancellationToken);

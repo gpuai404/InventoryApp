@@ -42,12 +42,6 @@ public sealed record CoverageSnapshot
             scopeStatement,
             nameof(scopeStatement),
             DomainTextLimits.WarrantyScopeStatement);
-
-        if (Scope == CoverageScope.RepairWorkAndReplacedParts &&
-            !string.Equals(ScopeStatement, RepairScopeStatement, StringComparison.Ordinal))
-        {
-            throw WarrantyExceptions.RepairScopeStatementInvalid(nameof(scopeStatement));
-        }
     }
 
     public WarrantyTerm Term { get; }
@@ -72,8 +66,10 @@ public sealed record CoverageSnapshot
 
     /// <summary>
     /// Persistence-only factory for validating and reconstituting historical
-    /// coverage. The coverage description is historical, while the repair
-    /// limitation remains a mandatory aggregate invariant.
+    /// coverage. Both text values are historical snapshots and may use wording
+    /// from an earlier application version. New repair coverage is still
+    /// created only through <see cref="ForRepair"/> with the current mandatory
+    /// limitation.
     /// </summary>
     public static CoverageSnapshot Reconstitute(
         WarrantyTerm term,

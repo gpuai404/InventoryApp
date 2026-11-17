@@ -27,6 +27,7 @@ public sealed class WarrantyTests
             WarrantyPlanId.New(),
             imei,
             IssuedAt,
+            new DateOnly(2026, 1, 2),
             customer,
             product,
             issuer,
@@ -52,9 +53,10 @@ public sealed class WarrantyTests
 
         var warranty = Warranty.IssueForRepair(
             "wr-repair-001",
-            null,
+            WarrantyPlanId.New(),
             null,
             IssuedAt,
+            new DateOnly(2026, 1, 2),
             new CustomerSnapshot("Ada"),
             ProductSnapshot(),
             IssuerSnapshot(),
@@ -72,9 +74,10 @@ public sealed class WarrantyTests
     {
         var exception = Assert.Throws<DomainRuleViolationException>(() => Warranty.IssueForSale(
             "WR-SALE-001",
-            null,
+            WarrantyPlanId.New(),
             null,
             IssuedAt,
+            new DateOnly(2026, 1, 2),
             new CustomerSnapshot("Ada"),
             ProductSnapshot(),
             IssuerSnapshot(),
@@ -89,9 +92,10 @@ public sealed class WarrantyTests
     {
         var exception = Assert.Throws<DomainRuleViolationException>(() => Warranty.IssueForRepair(
             "WR-REPAIR-001",
-            null,
+            WarrantyPlanId.New(),
             null,
             IssuedAt,
+            new DateOnly(2026, 1, 2),
             new CustomerSnapshot("Ada"),
             ProductSnapshot(),
             IssuerSnapshot(),
@@ -106,9 +110,10 @@ public sealed class WarrantyTests
     {
         Assert.Throws<DomainValidationException>(() => Warranty.IssueForRepair(
             "WR-REPAIR-001",
-            null,
+            WarrantyPlanId.New(),
             null,
             IssuedAt,
+            new DateOnly(2026, 1, 2),
             new CustomerSnapshot("Ada"),
             ProductSnapshot(),
             null!,
@@ -149,15 +154,54 @@ public sealed class WarrantyTests
     }
 
     [Fact]
-    public void Repair_scope_cannot_be_reconstituted_as_entire_product_coverage()
+    public void Sale_issuance_rejects_a_purchase_date_after_the_issuance_business_date()
     {
-        var exception = Assert.Throws<DomainRuleViolationException>(() => CoverageSnapshot.Reconstitute(
+        var exception = Assert.Throws<DomainRuleViolationException>(() => Warranty.IssueForSale(
+            "WR-FUTURE-SALE",
+            WarrantyPlanId.New(),
+            null,
+            IssuedAt,
+            new DateOnly(2026, 1, 2),
+            new CustomerSnapshot("Ada"),
+            ProductSnapshot(),
+            IssuerSnapshot(),
+            CoverageSnapshot.ForProductSale(new WarrantyTerm(12), "Product coverage"),
+            new SaleDetails(new DateOnly(2026, 1, 3))));
+
+        Assert.Equal(DomainErrorCodes.WarrantyBusinessDateInvalid, exception.Code);
+    }
+
+    [Fact]
+    public void Repair_issuance_rejects_a_repair_date_after_the_issuance_business_date()
+    {
+        var exception = Assert.Throws<DomainRuleViolationException>(() => Warranty.IssueForRepair(
+            "WR-FUTURE-REPAIR",
+            WarrantyPlanId.New(),
+            null,
+            IssuedAt,
+            new DateOnly(2026, 1, 2),
+            new CustomerSnapshot("Ada"),
+            ProductSnapshot(),
+            IssuerSnapshot(),
+            CoverageSnapshot.ForRepair(new WarrantyTerm(6), "Repair work"),
+            new RepairDetails(new DateOnly(2026, 1, 3), "Repaired battery")));
+
+        Assert.Equal(DomainErrorCodes.WarrantyBusinessDateInvalid, exception.Code);
+    }
+
+    [Fact]
+    public void Reconstitution_preserves_historical_repair_scope_wording()
+    {
+        const string historicalWording =
+            "This warranty covers the completed repair under the terms used when it was issued.";
+
+        var coverage = CoverageSnapshot.Reconstitute(
             new WarrantyTerm(6),
             CoverageScope.RepairWorkAndReplacedParts,
             "Repair work",
-            "This warranty covers the entire product."));
+            historicalWording);
 
-        Assert.Equal(DomainErrorCodes.WarrantyCoverageInvalid, exception.Code);
+        Assert.Equal(historicalWording, coverage.ScopeStatement);
     }
 
     private static ProductSnapshot ProductSnapshot() =>

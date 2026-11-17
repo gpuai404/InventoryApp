@@ -8,28 +8,18 @@ public sealed record CustomerInput(
     string? Phone = null,
     string? Address = null);
 
-/// <summary>
-/// Selects exactly one source for the coverage captured by an issued warranty.
-/// </summary>
-public abstract record CoverageInput;
-
-public sealed record WarrantyPlanCoverageInput(Guid WarrantyPlanId) : CoverageInput;
-
-public sealed record ExplicitCoverageInput(int TermMonths, string CoverageDescription)
-    : CoverageInput;
-
 public sealed record ReplacedPartInput(string Description, string? PartNumber = null);
 
 public sealed record IssueProductSaleWarrantyRequest(
     Guid ProductId,
-    CoverageInput Coverage,
+    Guid WarrantyPlanId,
     string? Imei,
     CustomerInput Customer,
     DateOnly PurchasedOn);
 
 public sealed record IssueRepairWarrantyRequest(
     Guid ProductId,
-    CoverageInput Coverage,
+    Guid WarrantyPlanId,
     string? Imei,
     CustomerInput Customer,
     DateOnly RepairedOn,

@@ -29,7 +29,7 @@ public sealed class ProductCommandService
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
     }
 
-    public async Task<ProductDto> CreateProductAsync(
+    public async Task<ProductDto> CreateAsync(
         CreateProductRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -52,7 +52,7 @@ public sealed class ProductCommandService
         return product.ToDto();
     }
 
-    public async Task<ProductDto> UpdateProductAsync(
+    public async Task<ProductDto> UpdateAsync(
         Guid productId,
         UpdateProductRequest request,
         CancellationToken cancellationToken = default)
@@ -80,7 +80,7 @@ public sealed class ProductCommandService
         return revised.ToDto();
     }
 
-    public async Task ArchiveProductAsync(
+    public async Task ArchiveAsync(
         Guid productId,
         CancellationToken cancellationToken = default)
     {

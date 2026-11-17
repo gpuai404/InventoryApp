@@ -1,33 +1,72 @@
-# Warranty Issuance
+# WarrantyIssueXE
 
-A single-company .NET MAUI + Blazor Hybrid application for maintaining a product catalog and issuing durable warranty certificates for product sales and repairs.
+WarrantyIssueXE is the core of a single-company warranty-certificate application for a retailer or repair business. It maintains a product catalog and issues immutable historical warranties for exactly two workflows: product sales and repairs.
 
-## Confirmed product decisions
+The intended client is a .NET 10 MAUI Blazor Hybrid application using a local SQLite database. This repository does **not** yet contain the MAUI host, Razor components, a complete user interface, or certificate rendering and printing.
 
-- **Client:** .NET MAUI with Blazor Hybrid.
-- **Database:** SQLite.
-- **Business scope:** one operating company. There is no multi-company, tenant, company registration, company switching, or company-level data isolation feature.
-- **Administration:** one global administrator manages the application. Do not add company memberships or per-company permissions.
-- **Initial topology:** one application installation/active instance with its own local SQLite database. Treat tenant count and active application-instance count as one by design; do not add tenant/instance configuration switches or infrastructure yet. Multiple devices or instances are future requirements and need an explicit architecture decision. Never share a live SQLite file over a network drive.
+## Current structure
 
-## Current core implementation
+- `src/WarrantyIssueXE.Domain` — entities, strongly typed identifiers, value objects, snapshots, warranty details, and business invariants.
+- `src/WarrantyIssueXE.Application` — explicit catalog, issuer-profile, warranty-plan, and warranty issuance/query services plus persistence, clock, and certificate-number ports.
+- `src/WarrantyIssueXE.Infrastructure` — EF Core SQLite records and mappings, repositories, unit of work, dependency injection, migration support, and technical service implementations.
+- `tests/WarrantyIssueXE.Domain.Tests` — domain behavior and invariant tests.
+- `tests/WarrantyIssueXE.Application.Tests` — application-service tests using focused fakes.
+- `tests/WarrantyIssueXE.Infrastructure.Tests` — real SQLite persistence, migration, dependency-injection, and application-to-infrastructure integration tests.
 
-The repository contains three core projects:
+Dependencies point inward:
 
-- `src/WarrantyIssueXE.Domain`
-- `src/WarrantyIssueXE.Application`
-- `src/WarrantyIssueXE.Infrastructure`
+```text
+Infrastructure -> Application -> Domain
+                         tests -> implemented layer(s)
+```
 
-Infrastructure uses Entity Framework Core with SQLite. A root solution, central build/package configuration, and Domain, Application, and SQLite test projects are present. The MAUI/Blazor presentation host and administrator authentication remain subsequent work.
+Domain has no EF Core, SQLite, MAUI, or presentation dependency. Application coordinates use cases through focused ports. Infrastructure implements those ports without exposing persistence records to Domain or Application.
 
-The active model has one configured `IssuerProfile`. Warranty plans are installation-wide, and each issued warranty owns an immutable issuer snapshot.
+## Technical stack
 
-Products and variants can be maintained without barcodes. A barcode is an optional, globally unique variant lookup value and is assigned through an explicit catalogue command; warranty issuance does not require or snapshot it.
+- .NET 10 and C# with nullable reference types enabled
+- Entity Framework Core 10 with the SQLite provider
+- SQLite with migration-based schema creation
+- xUnit and Microsoft.NET.Test.Sdk
+- Central package version management through `Directory.Packages.props`
 
-## Important domain distinction
+## Implemented behavior
 
-An issued warranty is a historical business record. Product, issuer, customer, and coverage details are captured as snapshots at issuance. Voiding is a controlled lifecycle transition; ordinary editing of an issued certificate is not part of the observed model.
+- Category and product catalog commands and queries, including soft archival.
+- Category archival is rejected while active products reference the category. Products can be reassigned to another active category first.
+- One current issuer profile, copied into each issued warranty as a historical snapshot.
+- Product-sale and repair warranty issuance from administrator-managed, workflow-specific warranty plans.
+- Optional IMEI, customer snapshots, product/category/price snapshots, issuer snapshots, and repair replaced-part snapshots.
+- Immutable issued warranties that remain readable after catalog or issuer changes.
+- One EF Core `InitialCreate` migration and tested SQLite repository implementations.
 
-## Documentation
+Product variants, barcode lookup, generic serial-number lookup, and warranty voiding are not part of the current model.
 
-Start with the product, architecture, documentation under `docs/`.
+## Build and test
+
+Install a .NET 10 SDK, then run from the repository root:
+
+```bash
+dotnet restore WarrantyIssueXE.sln
+dotnet build WarrantyIssueXE.sln --no-restore
+dotnet test WarrantyIssueXE.sln --no-build --no-restore
+```
+
+The test suite uses temporary SQLite databases and does not require a separately installed database server.
+
+## SQLite migrations
+
+The current migration is in `src/WarrantyIssueXE.Infrastructure/Persistence/Migrations`. A future host should:
+
+1. Choose an application-data path on the target platform. A live SQLite file must not be shared over a network drive.
+2. Register Infrastructure with `AddInventoryInfrastructure(databasePath, businessTimeZone)`.
+3. Apply migrations once during startup with `MigrateInventoryDatabaseAsync()` before enabling UI operations.
+4. Create one dependency-injection scope per application operation and dispose it when the operation completes.
+
+Production startup should use migrations, not `EnsureCreated`, so the migration history remains authoritative.
+
+## Before the first usable MAUI release
+
+The remaining work includes the MAUI Blazor Hybrid host and host-level Application-service registrations, platform-specific database-path selection, startup migration/error handling, operation-scoped UI invocation, forms and navigation for the implemented workflows, certificate rendering/printing and reprinting, user-facing validation and concurrency handling, backup/recovery behavior, packaging, and platform testing. Authentication and any multi-device topology require explicit product and architecture decisions; neither exists today.
+
+See [Pre-presentation technical decisions](docs/PRE_PRESENTATION_TECHNICAL_DECISIONS.md) for the Money precision assessment, MAUI DbContext lifetime design, current integration risks, and CI design.

@@ -52,11 +52,10 @@ public sealed class WarrantyCommandService
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(request.Customer);
-        ArgumentNullException.ThrowIfNull(request.Coverage);
 
         var context = await LoadIssuanceContextAsync(request.ProductId, cancellationToken);
-        var coverage = await ResolveCoverageAsync(
-            request.Coverage,
+        var coverage = await ResolvePlanCoverageAsync(
+            request.WarrantyPlanId,
             WarrantyType.ProductSale,
             cancellationToken);
         var currentTime = _clock.GetCurrent();
@@ -85,11 +84,10 @@ public sealed class WarrantyCommandService
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(request.Customer);
-        ArgumentNullException.ThrowIfNull(request.Coverage);
 
         var context = await LoadIssuanceContextAsync(request.ProductId, cancellationToken);
-        var coverage = await ResolveCoverageAsync(
-            request.Coverage,
+        var coverage = await ResolvePlanCoverageAsync(
+            request.WarrantyPlanId,
             WarrantyType.Repair,
             cancellationToken);
         var currentTime = _clock.GetCurrent();
@@ -138,34 +136,17 @@ public sealed class WarrantyCommandService
         return new IssuanceContext(product, category, issuer);
     }
 
-    private async Task<ResolvedCoverage> ResolveCoverageAsync(
-        CoverageInput coverage,
+    private async Task<ResolvedCoverage> ResolvePlanCoverageAsync(
+        Guid warrantyPlanId,
         WarrantyType type,
         CancellationToken cancellationToken)
     {
-        if (coverage is WarrantyPlanCoverageInput planCoverage)
-        {
-            var typedPlanId = new WarrantyPlanId(planCoverage.WarrantyPlanId);
-            var plan = await _planReader
-                .GetByIdAsync(typedPlanId, cancellationToken)
-                .RequireFoundAsync(typedPlanId.Value);
+        var typedPlanId = new WarrantyPlanId(warrantyPlanId);
+        var plan = await _planReader
+            .GetByIdAsync(typedPlanId, cancellationToken)
+            .RequireFoundAsync(typedPlanId.Value);
 
-            return new ResolvedCoverage(typedPlanId, plan.CreateCoverageFor(type));
-        }
-
-        if (coverage is ExplicitCoverageInput explicitCoverage)
-        {
-            var term = new WarrantyTerm(explicitCoverage.TermMonths);
-            var snapshot = type == WarrantyType.ProductSale
-                ? CoverageSnapshot.ForProductSale(term, explicitCoverage.CoverageDescription)
-                : CoverageSnapshot.ForRepair(term, explicitCoverage.CoverageDescription);
-
-            return new ResolvedCoverage(null, snapshot);
-        }
-
-        throw new ApplicationValidationException(
-            "The coverage source is not supported.",
-            nameof(coverage));
+        return new ResolvedCoverage(typedPlanId, plan.CreateCoverageFor(type));
     }
 
     private static Imei? ToImei(string? value) =>
@@ -176,5 +157,5 @@ public sealed class WarrantyCommandService
 
     private sealed record IssuanceContext(Product Product, Category Category, IssuerProfile Issuer);
 
-    private sealed record ResolvedCoverage(WarrantyPlanId? WarrantyPlanId, CoverageSnapshot Snapshot);
+    private sealed record ResolvedCoverage(WarrantyPlanId WarrantyPlanId, CoverageSnapshot Snapshot);
 }

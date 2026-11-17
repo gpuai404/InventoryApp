@@ -40,11 +40,6 @@ internal static class WarrantyExceptions
             message,
             propertyName);
 
-    public static DomainRuleViolationException RepairScopeStatementInvalid(string propertyName) =>
-        CoverageInvalid(
-            propertyName,
-            "A repair warranty scope statement must use the domain-defined repair limitation.");
-
     public static DomainValidationException TimestampRequired(string propertyName) =>
         new(
             DomainErrorCodes.WarrantyTimestampRequired,

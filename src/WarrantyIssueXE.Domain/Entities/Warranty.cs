@@ -116,35 +116,7 @@ public sealed class Warranty : Entity<WarrantyId>
 
     public static Warranty IssueForSale(
         string certificateNumber,
-        WarrantyPlanId? warrantyPlanId,
-        Imei? imei,
-        DateTimeOffset issuedAt,
-        CustomerSnapshot customer,
-        ProductSnapshot product,
-        IssuerSnapshot issuer,
-        CoverageSnapshot coverage,
-        SaleDetails saleDetails,
-        WarrantyId? id = null)
-    {
-        var validatedSaleDetails = DomainGuard.Required(saleDetails, nameof(saleDetails));
-
-        return IssueForSale(
-            certificateNumber,
-            warrantyPlanId,
-            imei,
-            issuedAt,
-            validatedSaleDetails.PurchasedOn,
-            customer,
-            product,
-            issuer,
-            coverage,
-            validatedSaleDetails,
-            id);
-    }
-
-    public static Warranty IssueForSale(
-        string certificateNumber,
-        WarrantyPlanId? warrantyPlanId,
+        WarrantyPlanId warrantyPlanId,
         Imei? imei,
         DateTimeOffset issuedAt,
         DateOnly issuanceBusinessDate,
@@ -181,35 +153,7 @@ public sealed class Warranty : Entity<WarrantyId>
 
     public static Warranty IssueForRepair(
         string certificateNumber,
-        WarrantyPlanId? warrantyPlanId,
-        Imei? imei,
-        DateTimeOffset issuedAt,
-        CustomerSnapshot customer,
-        ProductSnapshot product,
-        IssuerSnapshot issuer,
-        CoverageSnapshot coverage,
-        RepairDetails repairDetails,
-        WarrantyId? id = null)
-    {
-        var validatedRepairDetails = DomainGuard.Required(repairDetails, nameof(repairDetails));
-
-        return IssueForRepair(
-            certificateNumber,
-            warrantyPlanId,
-            imei,
-            issuedAt,
-            validatedRepairDetails.RepairedOn,
-            customer,
-            product,
-            issuer,
-            coverage,
-            validatedRepairDetails,
-            id);
-    }
-
-    public static Warranty IssueForRepair(
-        string certificateNumber,
-        WarrantyPlanId? warrantyPlanId,
+        WarrantyPlanId warrantyPlanId,
         Imei? imei,
         DateTimeOffset issuedAt,
         DateOnly issuanceBusinessDate,

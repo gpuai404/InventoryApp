@@ -25,6 +25,13 @@ public sealed class ProductRepository(InventoryDbContext dbContext, TimeProvider
         .Select(product => product.ToDomain())
         .ToArray();
 
+    public Task<bool> HasActiveProductsInCategoryAsync(
+        CategoryId categoryId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Products.AsNoTracking().AnyAsync(
+            product => product.CategoryId == categoryId.Value,
+            cancellationToken);
+
     public Task AddAsync(Product entity, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entity);

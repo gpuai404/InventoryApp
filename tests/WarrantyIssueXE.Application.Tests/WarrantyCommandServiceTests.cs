@@ -22,7 +22,7 @@ public sealed class WarrantyCommandServiceTests
         var plan = fixture.AddPlan(WarrantyType.ProductSale, 24, "Parts and labour");
 
         var issued = await fixture.Service.IssueProductSaleWarrantyAsync(
-            fixture.SaleRequest(new WarrantyPlanCoverageInput(plan.Id.Value)));
+            fixture.SaleRequest(plan.Id.Value));
 
         Assert.Equal(WarrantyType.ProductSale, issued.Type);
         Assert.Equal(plan.Id.Value, issued.WarrantyPlanId);
@@ -44,19 +44,6 @@ public sealed class WarrantyCommandServiceTests
     }
 
     [Fact]
-    public async Task Explicit_sale_coverage_is_supported_without_a_plan()
-    {
-        var fixture = new Fixture();
-
-        var issued = await fixture.Service.IssueProductSaleWarrantyAsync(
-            fixture.SaleRequest(new ExplicitCoverageInput(12, "Standard product coverage")));
-
-        Assert.Null(issued.WarrantyPlanId);
-        Assert.Equal(12, issued.Coverage.TermMonths);
-        Assert.Equal(CoverageScope.Product, issued.Coverage.Scope);
-    }
-
-    [Fact]
     public async Task Product_sale_rejects_a_repair_plan_without_persisting()
     {
         var fixture = new Fixture();
@@ -64,7 +51,7 @@ public sealed class WarrantyCommandServiceTests
 
         var exception = await Assert.ThrowsAsync<DomainRuleViolationException>(() =>
             fixture.Service.IssueProductSaleWarrantyAsync(
-                fixture.SaleRequest(new WarrantyPlanCoverageInput(repairPlan.Id.Value))));
+                fixture.SaleRequest(repairPlan.Id.Value)));
 
         Assert.Equal(DomainErrorCodes.WarrantyPlanTypeMismatch, exception.Code);
         Assert.Empty(fixture.Warranties.Items);
@@ -78,7 +65,7 @@ public sealed class WarrantyCommandServiceTests
         var plan = fixture.AddPlan(WarrantyType.Repair, 6, "Repair work and replaced parts");
 
         var issued = await fixture.Service.IssueRepairWarrantyAsync(
-            fixture.RepairRequest(new WarrantyPlanCoverageInput(plan.Id.Value)));
+            fixture.RepairRequest(plan.Id.Value));
 
         Assert.Equal(WarrantyType.Repair, issued.Type);
         Assert.Equal(plan.Id.Value, issued.WarrantyPlanId);
@@ -96,7 +83,7 @@ public sealed class WarrantyCommandServiceTests
         var fixture = new Fixture();
         var plan = fixture.AddPlan(WarrantyType.Repair, 6, "Repair work");
         var request = fixture.RepairRequest(
-            new WarrantyPlanCoverageInput(plan.Id.Value),
+            plan.Id.Value,
             [new ReplacedPartInput("Battery", "BT-42"), new ReplacedPartInput("Connector")]);
 
         var issued = await fixture.Service.IssueRepairWarrantyAsync(request);
@@ -119,7 +106,7 @@ public sealed class WarrantyCommandServiceTests
 
         var exception = await Assert.ThrowsAsync<DomainRuleViolationException>(() =>
             fixture.Service.IssueRepairWarrantyAsync(
-                fixture.RepairRequest(new WarrantyPlanCoverageInput(salePlan.Id.Value))));
+                fixture.RepairRequest(salePlan.Id.Value)));
 
         Assert.Equal(DomainErrorCodes.WarrantyPlanTypeMismatch, exception.Code);
         Assert.Empty(fixture.Warranties.Items);
@@ -134,7 +121,7 @@ public sealed class WarrantyCommandServiceTests
 
         await Assert.ThrowsAsync<EntityNotFoundException>(() =>
             fixture.Service.IssueProductSaleWarrantyAsync(
-                fixture.SaleRequest(new ExplicitCoverageInput(12, "Coverage"))));
+                fixture.SaleRequest()));
 
         Assert.Equal(0, fixture.UnitOfWork.SaveCount);
     }
@@ -146,7 +133,7 @@ public sealed class WarrantyCommandServiceTests
 
         await Assert.ThrowsAsync<EntityNotFoundException>(() =>
             fixture.Service.IssueProductSaleWarrantyAsync(
-                fixture.SaleRequest(new WarrantyPlanCoverageInput(Guid.NewGuid()))));
+                fixture.SaleRequest(Guid.NewGuid())));
 
         Assert.Equal(0, fixture.UnitOfWork.SaveCount);
     }
@@ -158,7 +145,7 @@ public sealed class WarrantyCommandServiceTests
 
         var exception = await Assert.ThrowsAsync<ApplicationValidationException>(() =>
             fixture.Service.IssueProductSaleWarrantyAsync(
-                fixture.SaleRequest(new ExplicitCoverageInput(12, "Coverage"))));
+                fixture.SaleRequest()));
 
         Assert.Equal("issuerProfile", exception.ParamName);
         Assert.Equal(0, fixture.UnitOfWork.SaveCount);
@@ -168,7 +155,7 @@ public sealed class WarrantyCommandServiceTests
     public async Task Invalid_customer_input_propagates_domain_validation_without_persisting()
     {
         var fixture = new Fixture();
-        var request = fixture.SaleRequest(new ExplicitCoverageInput(12, "Coverage")) with
+        var request = fixture.SaleRequest() with
         {
             Customer = new CustomerInput(" ")
         };
@@ -184,7 +171,7 @@ public sealed class WarrantyCommandServiceTests
     public async Task Invalid_repair_description_propagates_domain_validation_without_persisting()
     {
         var fixture = new Fixture();
-        var request = fixture.RepairRequest(new ExplicitCoverageInput(6, "Repair coverage")) with
+        var request = fixture.RepairRequest() with
         {
             WorkDescription = " "
         };
@@ -200,7 +187,7 @@ public sealed class WarrantyCommandServiceTests
     public async Task Invalid_imei_propagates_domain_validation_without_persisting()
     {
         var fixture = new Fixture();
-        var request = fixture.SaleRequest(new ExplicitCoverageInput(12, "Coverage")) with
+        var request = fixture.SaleRequest() with
         {
             Imei = "invalid"
         };
@@ -219,7 +206,7 @@ public sealed class WarrantyCommandServiceTests
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             fixture.Service.IssueProductSaleWarrantyAsync(
-                fixture.SaleRequest(new ExplicitCoverageInput(12, "Coverage"))));
+                fixture.SaleRequest()));
 
         Assert.Equal("Database unavailable", exception.Message);
         Assert.Equal(0, fixture.UnitOfWork.SaveCount);
@@ -233,6 +220,8 @@ public sealed class WarrantyCommandServiceTests
             Product = new Product(Category.Id, "Laptop", new Money(899.99m, "EUR"));
             Products.Items[Product.Id] = Product;
             Categories.Items[Category.Id] = Category;
+            SalePlan = AddPlan(WarrantyType.ProductSale, 12, "Standard product coverage");
+            RepairPlan = AddPlan(WarrantyType.Repair, 6, "Repair coverage");
             IssuerStore.Profile = useDefaultIssuer
                 ? issuer ?? new DomainIssuerProfile(
                     "Contoso Retail",
@@ -255,6 +244,8 @@ public sealed class WarrantyCommandServiceTests
 
         public Product Product { get; }
         public Category Category { get; }
+        public WarrantyPlan SalePlan { get; }
+        public WarrantyPlan RepairPlan { get; }
         public FakeProductReader Products { get; } = new();
         public FakeCategoryReader Categories { get; } = new();
         public FakePlanReader Plans { get; } = new();
@@ -270,10 +261,10 @@ public sealed class WarrantyCommandServiceTests
             return plan;
         }
 
-        public IssueProductSaleWarrantyRequest SaleRequest(CoverageInput coverage) =>
+        public IssueProductSaleWarrantyRequest SaleRequest(Guid? warrantyPlanId = null) =>
             new(
                 Product.Id.Value,
-                coverage,
+                warrantyPlanId ?? SalePlan.Id.Value,
                 "490154203237518",
                 new CustomerInput(
                     "Ada",
@@ -283,11 +274,11 @@ public sealed class WarrantyCommandServiceTests
                 new DateOnly(2026, 1, 1));
 
         public IssueRepairWarrantyRequest RepairRequest(
-            CoverageInput coverage,
+            Guid? warrantyPlanId = null,
             IReadOnlyCollection<ReplacedPartInput>? replacedParts = null) =>
             new(
                 Product.Id.Value,
-                coverage,
+                warrantyPlanId ?? RepairPlan.Id.Value,
                 null,
                 new CustomerInput("Ada"),
                 new DateOnly(2026, 1, 1),
@@ -308,6 +299,11 @@ public sealed class WarrantyCommandServiceTests
 
         public Task<IReadOnlyList<Product>> ListAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<Product>>(Items.Values.ToArray());
+
+        public Task<bool> HasActiveProductsInCategoryAsync(
+            CategoryId categoryId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(Items.Values.Any(product => product.CategoryId == categoryId));
     }
 
     private sealed class FakeCategoryReader : ICategoryReader

@@ -17,7 +17,7 @@ public sealed class ProductApplicationServiceTests
         var unitOfWork = new FakeUnitOfWork();
         var service = CreateService(new FakeCategoryReader(category), products, unitOfWork);
 
-        var result = await service.CreateProductAsync(new CreateProductRequest(
+        var result = await service.CreateAsync(new CreateProductRequest(
             category.Id.Value,
             " USB-C Cable ",
             12.50m,
@@ -40,7 +40,7 @@ public sealed class ProductApplicationServiceTests
         var unitOfWork = new FakeUnitOfWork();
         var service = CreateService(new FakeCategoryReader(), products, unitOfWork);
 
-        await Assert.ThrowsAsync<EntityNotFoundException>(() => service.CreateProductAsync(
+        await Assert.ThrowsAsync<EntityNotFoundException>(() => service.CreateAsync(
             new CreateProductRequest(Guid.NewGuid(), "Cable", 10m, "EUR")));
 
         Assert.Empty(products.Items);
@@ -61,7 +61,7 @@ public sealed class ProductApplicationServiceTests
             products,
             unitOfWork);
 
-        var result = await service.UpdateProductAsync(
+        var result = await service.UpdateAsync(
             original.Id.Value,
             new UpdateProductRequest(
                 replacementCategory.Id.Value,
@@ -84,7 +84,7 @@ public sealed class ProductApplicationServiceTests
         var unitOfWork = new FakeUnitOfWork();
         var service = CreateService(new FakeCategoryReader(category), products, unitOfWork);
 
-        await Assert.ThrowsAsync<EntityNotFoundException>(() => service.UpdateProductAsync(
+        await Assert.ThrowsAsync<EntityNotFoundException>(() => service.UpdateAsync(
             Guid.NewGuid(),
             new UpdateProductRequest(category.Id.Value, "Cable", 10m, "EUR")));
 
@@ -100,7 +100,7 @@ public sealed class ProductApplicationServiceTests
         var unitOfWork = new FakeUnitOfWork();
         var service = CreateService(new FakeCategoryReader(), products, unitOfWork);
 
-        await service.ArchiveProductAsync(product.Id.Value);
+        await service.ArchiveAsync(product.Id.Value);
 
         Assert.Empty(products.Items);
         Assert.Equal(1, unitOfWork.SaveCount);
@@ -116,8 +116,8 @@ public sealed class ProductApplicationServiceTests
         products.Items[second.Id] = second;
         var service = new ProductQueryService(products);
 
-        var selected = await service.GetProductAsync(first.Id.Value);
-        var all = await service.ListProductsAsync();
+        var selected = await service.GetAsync(first.Id.Value);
+        var all = await service.ListAsync();
 
         Assert.Equal(first.Id.Value, selected!.Id);
         Assert.Equal(2, all.Count);
@@ -154,6 +154,11 @@ public sealed class ProductApplicationServiceTests
 
         public Task<IReadOnlyList<Product>> ListAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<Product>>(Items.Values.ToArray());
+
+        public Task<bool> HasActiveProductsInCategoryAsync(
+            CategoryId categoryId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(Items.Values.Any(product => product.CategoryId == categoryId));
 
         public Task AddAsync(Product product, CancellationToken cancellationToken = default)
         {

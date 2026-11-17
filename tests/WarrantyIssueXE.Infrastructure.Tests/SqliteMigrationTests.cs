@@ -50,6 +50,7 @@ public sealed class SqliteMigrationTests
                 WarrantyPlanId.New(),
                 new Imei("490154203237518"),
                 saleIssuedAt,
+                new DateOnly(2026, 10, 25),
                 saleCustomer,
                 productSnapshot,
                 issuerSnapshot,
@@ -57,9 +58,10 @@ public sealed class SqliteMigrationTests
                 new SaleDetails(salePurchasedOn));
             var repairWarranty = Warranty.IssueForRepair(
                 "migration-repair-001",
-                warrantyPlanId: null,
+                WarrantyPlanId.New(),
                 imei: null,
                 new DateTimeOffset(2026, 11, 2, 16, 15, 0, TimeSpan.FromHours(1)),
+                new DateOnly(2026, 11, 2),
                 new CustomerSnapshot("Grace Hopper", "grace@example.test"),
                 productSnapshot,
                 issuerSnapshot,
@@ -73,9 +75,10 @@ public sealed class SqliteMigrationTests
                     ]));
             var laborOnlyWarranty = Warranty.IssueForRepair(
                 "migration-repair-labor-001",
-                warrantyPlanId: null,
+                WarrantyPlanId.New(),
                 imei: null,
                 new DateTimeOffset(2026, 11, 3, 9, 0, 0, TimeSpan.FromHours(1)),
+                new DateOnly(2026, 11, 3),
                 new CustomerSnapshot("Katherine Johnson", phone: "+323333333"),
                 productSnapshot,
                 issuerSnapshot,
@@ -134,9 +137,10 @@ public sealed class SqliteMigrationTests
 
                     await warrantyRepository.AddAsync(Warranty.IssueForSale(
                         saleWarranty.CertificateNumber.ToLowerInvariant(),
-                        warrantyPlanId: null,
+                        WarrantyPlanId.New(),
                         imei: null,
                         saleIssuedAt,
+                        new DateOnly(2026, 10, 25),
                         saleCustomer,
                         productSnapshot,
                         issuerSnapshot,

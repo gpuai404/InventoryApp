@@ -348,6 +348,7 @@ public sealed class SqliteCrudTests
             new WarrantyPlanId(Guid.NewGuid()),
             new Imei("490154203237518"),
             issuedAt,
+            new DateOnly(2026, 3, 15),
             new CustomerSnapshot("Ada Lovelace", "ada@example.test", "+32123", "Customer Lane 5"),
             product ?? CreateProductSnapshot(),
             CreateIssuerSnapshot(),
@@ -364,9 +365,10 @@ public sealed class SqliteCrudTests
 
         return Warranty.IssueForRepair(
             certificateNumber,
-            warrantyPlanId: null,
+            WarrantyPlanId.New(),
             imei: null,
             issuedAt,
+            new DateOnly(2026, 4, 20),
             new CustomerSnapshot("Grace Hopper", "grace@example.test"),
             CreateProductSnapshot(),
             CreateIssuerSnapshot(),

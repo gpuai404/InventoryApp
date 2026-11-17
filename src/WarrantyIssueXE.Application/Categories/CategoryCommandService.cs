@@ -9,15 +9,18 @@ public sealed class CategoryCommandService
 {
     private readonly ICategoryReader _reader;
     private readonly ICategoryWriter _writer;
+    private readonly IProductReader _productReader;
     private readonly IUnitOfWork _unitOfWork;
 
     public CategoryCommandService(
         ICategoryReader reader,
         ICategoryWriter writer,
+        IProductReader productReader,
         IUnitOfWork unitOfWork)
     {
         _reader = reader ?? throw new ArgumentNullException(nameof(reader));
         _writer = writer ?? throw new ArgumentNullException(nameof(writer));
+        _productReader = productReader ?? throw new ArgumentNullException(nameof(productReader));
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
     }
 
@@ -60,6 +63,11 @@ public sealed class CategoryCommandService
         await _reader
             .GetByIdAsync(typedId, cancellationToken)
             .RequireFoundAsync(typedId.Value);
+
+        if (await _productReader.HasActiveProductsInCategoryAsync(typedId, cancellationToken))
+        {
+            throw new CategoryInUseException(typedId.Value);
+        }
 
         await _writer.ArchiveAsync(typedId, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
